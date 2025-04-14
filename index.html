@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="./resources/ol.css">
+        <link rel="stylesheet" href="resources/fontawesome-all.min.css">
+        <link rel="stylesheet" href="./resources/ol-layerswitcher.css">
+        <link rel="stylesheet" href="./resources/qgis2web.css">
+        <style>
+        html, body {
+            background-color: #ffffff;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: row;
+        }
+        #form-container {
+            width: 25%;
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: #f0f0f0;
+            border-right: 1px solid #ccc;
+        }
+        #map {
+            width: 75%;
+            height: 100%;
+        }
+        .ol-control > * {
+            background-color: #f8f8f8!important;
+            color: #444444!important;
+            border-radius: 0px;
+        }
+        .ol-attribution a, .gcd-gl-input::placeholder, .search-layer-input-search::placeholder {
+            color: #444444!important;
+        }
+        .search-layer-input-search {
+            background-color: #f8f8f8!important;
+        }
+        .ol-control > *:focus, .ol-control >*:hover {
+            background-color: rgba(248, 248, 248, 0.7)!important;
+        } 
+        .ol-control {
+            background-color: rgba(255,255,255,.4) !important;
+            padding: 2px !important;
+        }
+
+        /* Form styling */
+        #form-container label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #form-container input {
+            width: 100%;
+            padding: 6px;
+            margin-top: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        h3 {
+            background-color: #add8e6;  
+            padding: 10px;              
+            border-radius: 5px;         
+            text-align: center;         
+            margin: 0 0 10px 0;         
+        }
+        </style>
+        <title>QGIS PLUGIN</title>
+    </head>
+    <body>
+        <!-- Form Identitas (tidak untuk kirim) -->
+        <div id="form-container">
+            <h3>Identitas</h3>
+            <label for="nama">Nama:</label>
+            <input type="text" id="nama" name="nama">
+
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email">
+
+            <label for="umur">Umur:</label>
+            <input type="number" id="umur" name="umur" min="1" max="120">
+
+            <label for="kota">Kota:</label>
+            <input type="text" id="kota" name="kota">
+        </div>
+
+        <!-- Peta -->
+        <div id="map">
+            <div id="popup" class="ol-popup">
+                <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+                <div id="popup-content"></div>
+            </div>
+        </div>
+
+        <!-- Script Peta -->
+        <script src="resources/qgis2web_expressions.js"></script>
+        <script src="./resources/functions.js"></script>
+        <script src="./resources/ol.js"></script>
+        <script src="./resources/ol-layerswitcher.js"></script>
+        <script src="layers/sumaterabarat_0.js"></script>
+        <script src="layers/Padangadm_2.js"></script>
+        <script src="layers/databanjirkelompok_3.js"></script>
+        <script src="styles/sumaterabarat_0_style.js"></script>
+        <script src="styles/Padangadm_2_style.js"></script>
+        <script src="styles/databanjirkelompok_3_style.js"></script>
+        <script src="./layers/layers.js" type="text/javascript"></script> 
+        <script src="./resources/Autolinker.min.js"></script>
+        <script src="./resources/qgis2web.js"></script>
+
+        <!-- Script Geocoding dan Peta -->
+        <script>
+            // Cek apakah data sudah ada di Local Storage saat halaman dimuat
+            window.onload = function() {
+                if (localStorage.getItem('formData')) {
+                    const savedData = JSON.parse(localStorage.getItem('formData'));
+                    document.getElementById('nama').value = savedData.nama || '';
+                    document.getElementById('email').value = savedData.email || '';
+                    document.getElementById('umur').value = savedData.umur || '';
+                    document.getElementById('kota').value = savedData.kota || '';
+                }
+            };
+
+            // Simpan data form ke Local Storage saat ada perubahan pada form
+            document.getElementById('form-container').addEventListener('input', function() {
+                const formData = {
+                    nama: document.getElementById('nama').value,
+                    email: document.getElementById('email').value,
+                    umur: document.getElementById('umur').value,
+                    kota: document.getElementById('kota').value
+                };
+                localStorage.setItem('formData', JSON.stringify(formData));
+            });
+
+            var map = new ol.Map({
+                target: 'map',
+                layers: [
+                    new ol.layer.Tile({
+                        source: new ol.source.OSM()
+                    })
+                ],
+                view: new ol.View({
+                    center: ol.proj.fromLonLat([106.6297, -6.2088]), // Default ke Jakarta
+                    zoom: 10
+                })
+            });
+
+            var popup = new ol.Overlay({
+                element: document.getElementById('popup'),
+                autoPan: true,
+                autoPanAnimation: {
+                    duration: 250
+                }
+            });
+
+            map.addOverlay(popup);
+
+            map.on('click', function (evt) {
+                var coordinate = evt.coordinate;
+                var hdms = ol.coordinate.toStringHDMS(ol.proj.toLonLat(coordinate));
+                document.getElementById('popup-content').innerHTML = '<p>You clicked here: </p><code>' + hdms + '</code>';
+                popup.setPosition(coordinate);
+            });
+
+            function searchCity() {
+                var city = document.getElementById('kota').value;
+                if (city.length >= 3) {
+                    console.log(`Searching for: ${city}`);
+                    // Menggunakan API OpenCage Geocoder untuk mencari lokasi berdasarkan nama kota
+                    fetch(`https://api.opencagedata.com/geocode/v1/json?q=${city}&key=YOUR_API_KEY`)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Geocoder response:', data);  // Log response untuk debugging
+                            if (data.results && data.results.length > 0) {
+                                var latitude = data.results[0].geometry.lat;
+                                var longitude = data.results[0].geometry.lng;
+                                var newCenter = ol.proj.fromLonLat([longitude, latitude]);
+                                map.getView().setCenter(newCenter);
+                                map.getView().setZoom(12); // Zoom level yang lebih dekat
+                            } else {
+                                alert('Kota tidak ditemukan!');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                        });
+                }
+            }
+        </script>
+    </body>
+</html>
